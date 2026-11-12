@@ -1,22 +1,32 @@
 @echo off
+setlocal
 cd /d "%~dp0"
 title Shot Counter
 
-rem Offline mode needs its own global hotkey: start the bundled agent if it was built.
-set AGENT_PID=
-if exist "bin\shot-counter-hotkey.exe" (
-  for /f %%i in ('powershell -NoProfile -Command "(Start-Process -FilePath 'bin\shot-counter-hotkey.exe' -WindowStyle Minimized -PassThru).Id"') do set AGENT_PID=%%i
-  echo Local hotkey agent running. Close this window to stop everything.
-  echo.
-) else (
-  echo [offline] No local hotkey agent yet. Build it once with: node setup-local-hotkey.mjs
-  echo [offline] Without it, the app still counts from the dashboard button or the OBS hotkey.
-  echo.
-)
+if not exist "bin\shot-counter-hotkey.exe" goto build
+goto run
+
+:build
+echo First run: building the local hotkey agent.
+rem No internet and no extra tools: this compiles a small C# file with the
+rem .NET compiler that already ships with Windows.
+call node setup-local-hotkey.mjs
+echo.
+
+:run
+rem The agent reads its key from config.json and exits by itself once the app stops.
+start "Shot Counter hotkey" /min "bin\shot-counter-hotkey.exe"
+
+echo.
+echo Shot Counter is starting.
+echo   dashboard  http://localhost:4321/
+echo   overlay    http://localhost:4321/window
+echo Press your hotkey to add a shot.
+echo Close this window to stop the counter and the hotkey agent.
+echo.
 
 node server.mjs
 
-if defined AGENT_PID taskkill /PID %AGENT_PID% /F >nul 2>&1
 echo.
 echo Shot counter stopped. Press any key to close.
 pause >nul

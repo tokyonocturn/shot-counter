@@ -1,7 +1,10 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 // Local hotkey agent for Shot Counter.
@@ -11,12 +14,13 @@ using System.Threading;
 //
 // There is no keyboard hook, no key state polling, no injected input and no key
 // logging: Windows itself owns the shortcut and delivers one WM_HOTKEY message.
-// Same mechanism OBS uses for its own hotkeys, and it keeps working with OBS
-// closed, which is what the offline mode needs.
+// Same mechanism OBS uses for its own hotkeys, which is why the counter works
+// with OBS closed.
 internal static class Program
 {
     private const int WmHotkey = 0x0312;
     private const uint ModNorepeat = 0x4000;
+    private const uint DefaultKey = 0x78; // F9
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Msg
@@ -46,20 +50,38 @@ internal static class Program
     private static extern IntPtr DispatchMessage(ref Msg msg);
 
     private static string url = "http://127.0.0.1:4321/api/shot";
-    private static uint key = 0x2D; // Insert
+    private static uint key = DefaultKey;
+    private static bool watchServer = true;
 
     private static void Main(string[] args)
     {
+        bool keyGiven = false;
+        bool urlGiven = false;
+
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--key" && i + 1 < args.Length) key = ToVirtualKey(args[i + 1]);
-            else if (args[i] == "--url" && i + 1 < args.Length) url = args[i + 1];
+            if (args[i] == "--key" && i + 1 < args.Length)
+            {
+                key = ToVirtualKey(args[i + 1]);
+                keyGiven = true;
+            }
+            else if (args[i] == "--url" && i + 1 < args.Length)
+            {
+                url = args[i + 1];
+                urlGiven = true;
+            }
+            else if (args[i] == "--no-watch") watchServer = false;
             else if (args[i] == "--help" || args[i] == "-h")
             {
-                Console.WriteLine("shot-counter-hotkey [--key Insert] [--url http://127.0.0.1:4321/api/shot]");
+                Console.WriteLine("shot-counter-hotkey [--key F9] [--url http://127.0.0.1:4321/api/shot] [--no-watch]");
+                Console.WriteLine("Without --key the key is read from config.json (localHotkey.key).");
+                Console.WriteLine("The agent exits by itself when the Shot Counter app stops answering.");
                 return;
             }
         }
+
+        if (!keyGiven) key = KeyFromConfig();
+        if (!urlGiven) url = "http://127.0.0.1:" + PortFromConfig() + "/api/shot";
 
         bool first;
         using (var single = new Mutex(true, "ShotCounterLocalHotkey", out first))
@@ -69,6 +91,8 @@ internal static class Program
                 Console.Error.WriteLine("A local hotkey agent is already running.");
                 return;
             }
+
+            if (watchServer) StartServerWatch();
 
             // Another program (often OBS, with the same key) can own the shortcut.
             // Keep asking, so closing that program is enough to make this work.
@@ -99,6 +123,102 @@ internal static class Program
 
             UnregisterHotKey(IntPtr.Zero, 1);
         }
+    }
+
+    // The agent is a companion of the app, not a background service. It asks the
+    // app's own status endpoint whether it is still there; when the app stops, the
+    // agent leaves too, so closing the batch window never leaves anything behind.
+    // This checks the app, never the keyboard.
+    private static void StartServerWatch()
+    {
+        string baseUrl = url;
+        int cut = baseUrl.IndexOf("/api/");
+        if (cut > 0) baseUrl = baseUrl.Substring(0, cut);
+
+        var thread = new Thread(delegate()
+        {
+            bool everUp = false;
+            int misses = 0;
+
+            while (true)
+            {
+                try
+                {
+                    var request = (HttpWebRequest)WebRequest.Create(baseUrl + "/api/state");
+                    request.Method = "GET";
+                    request.Timeout = 900;
+                    using (var response = (HttpWebResponse)request.GetResponse())
+                    {
+                        response.Close();
+                    }
+                    everUp = true;
+                    misses = 0;
+                }
+                catch
+                {
+                    if (everUp)
+                    {
+                        misses++;
+                        if (misses >= 2)
+                        {
+                            Console.Error.WriteLine("Shot Counter stopped, closing the hotkey agent.");
+                            Environment.Exit(0);
+                        }
+                    }
+                }
+                Thread.Sleep(1000);
+            }
+        });
+        thread.IsBackground = true;
+        thread.Start();
+    }
+
+    private static int PortFromConfig()
+    {
+        string text = ConfigText();
+        if (text == null) return 4321;
+        Match match = Regex.Match(text, "\"port\"\\s*:\\s*(\\d+)");
+        if (match.Success)
+        {
+            int port;
+            if (int.TryParse(match.Groups[1].Value, out port) && port > 0 && port < 65536) return port;
+        }
+        return 4321;
+    }
+
+    private static string ConfigText()
+    {
+        string[] candidates = new string[]
+        {
+            Path.Combine(Environment.CurrentDirectory, "config.json"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "config.json"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json"),
+        };
+
+        foreach (string path in candidates)
+        {
+            try
+            {
+                if (File.Exists(path)) return File.ReadAllText(path);
+            }
+            catch
+            {
+            }
+        }
+        return null;
+    }
+
+    private static uint KeyFromConfig()
+    {
+        string text = ConfigText();
+        if (text == null) return DefaultKey;
+
+        Match match = Regex.Match(
+            text,
+            "\"localHotkey\"\\s*:\\s*\\{[^}]*?\"key\"\\s*:\\s*\"([^\"]+)\"",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        if (match.Success) return ToVirtualKey(match.Groups[1].Value);
+        return DefaultKey;
     }
 
     private static void Press()
@@ -164,7 +284,7 @@ internal static class Program
             if (c >= 'A' && c <= 'Z') return c;
             if (c >= '0' && c <= '9') return c;
         }
-        return 0x2D;
+        return DefaultKey;
     }
 
     private static string KeyName(uint vk)

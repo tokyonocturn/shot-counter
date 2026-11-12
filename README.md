@@ -17,15 +17,16 @@ The shelf holds **184 drinks** across 12 categories, including somaek and 27 sha
 
 ## Quick start, no OBS
 
+Download the packaged zip, or from a checkout:
+
 ```
 npm install
-node setup-local-hotkey.mjs     # builds bin/shot-counter-hotkey.exe once
-start.bat                       # starts the agent and the server together
+start.bat
 ```
 
-Then open <http://localhost:4321/> for the dashboard, or <http://localhost:4321/window> for the overlay on a second monitor.
+`start.bat` builds the hotkey agent on first run, starts the agent and the server together, and when you close its window it stops both: the agent watches the server process and exits as soon as the server is gone, so nothing is left running.
 
-`start.bat` starts both processes and stops the agent when you close the window. If you prefer the terminal: `npm run local-hotkey` in one window and `npm start` in another.
+Then open <http://localhost:4321/> for the dashboard, or <http://localhost:4321/window> for the overlay on a second monitor. If you prefer the terminal: `npm run local-hotkey` in one window and `npm start` in another.
 
 ## Quick start, with OBS
 
@@ -42,7 +43,7 @@ If you would rather bind the key by hand: OBS, Settings, Hotkeys, search for **S
 | Mode | Who registers the key | Needs OBS |
 | --- | --- | --- |
 | OBS | OBS, through its own hotkey system | yes |
-| Local agent | `bin/shot-counter-hotkey.exe`, through `RegisterHotKey` | no |
+| Local agent | `bin/shot-counter-hotkey.exe`, through `RegisterHotKey`, life tied to the server | no |
 | Button | the dashboard `+1 shot` button | no |
 
 Change the local key with `node setup-local-hotkey.mjs --key F8`, then restart the agent.
@@ -132,7 +133,8 @@ A license is a legal instrument, not a technical lock. GitHub still lets a visit
 
 ## Troubleshooting
 
-- **`RegisterHotKey` failed, or the key does nothing**: another program already owns that key. Pick another with `node setup-local-hotkey.mjs --key F9`.
+- **`RegisterHotKey` failed, or the key does nothing**: another program already owns that key. Pick another with `node setup-local-hotkey.mjs --key F9`, then restart `start.bat`.
+- **The agent is missing**: `start.bat` builds it on first run. If that failed, run `setup-local-hotkey.bat`, or `node setup-local-hotkey.mjs` in a terminal to see the compiler message.
 - **No agent built**: run `node setup-local-hotkey.mjs`, or use the dashboard button.
 - **Port 4321 already in use**: change `port` in `config.json`, then update the overlay URL in OBS.
 - **OBS connected but no counting**: the trigger binding is missing. Close OBS and run `npm run setup-hotkey`, or bind it by hand as described above.
