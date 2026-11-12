@@ -1,0 +1,20 @@
+{
+  "name": "shot-counter",
+  "version": "1.1.0",
+  "description": "Shot counter with a hotkey trigger and a transparent overlay, with or without OBS",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "setup-hotkey": "node setup-hotkey.mjs",
+    "setup-local-hotkey": "node setup-local-hotkey.mjs",
+    "local-hotkey": "node setup-local-hotkey.mjs && bin\\shot-counter-hotkey.exe",
+    "agent": "bin\\shot-counter-hotkey.exe",
+    "package": "node scripts/package.mjs"
+  },
+  "dependencies": {
+    "obs-websocket-js": "^5.0.8",
+    "ws": "^8.22.2"
+  },
+  "private": true
+}

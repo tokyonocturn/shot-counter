@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shot Counter</title>
+    <style>
+      :root {
+        --bg: #0b0d12;
+        --card: #141824;
+        --card-2: #1b2030;
+        --line: #262c3d;
+        --text: #eef1f8;
+        --muted: #8b93a7;
+        --accent: #ffb020;
+        --accent-2: #38e0a5;
+        --danger: #ff5a6a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 28px 22px 46px;
+        background: radial-gradient(1200px 600px at 15% -10%, #1c2333 0%, var(--bg) 55%);
+        color: var(--text);
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+        min-height: 100vh;
+      }
+      header {
+        max-width: 980px;
+        margin: 0 auto 22px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      h1 { font-size: 20px; margin: 0; letter-spacing: 0.4px; }
+      h1 span { color: var(--accent); }
+      .status {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 12px; color: var(--muted);
+        background: var(--card); border: 1px solid var(--line);
+        padding: 7px 12px; border-radius: 999px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: #4a5266; }
+      .dot.on { background: var(--accent-2); box-shadow: 0 0 10px var(--accent-2); }
+      .dot.live { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+      main {
+        max-width: 980px; margin: 0 auto;
+        display: grid; gap: 16px;
+        grid-template-columns: 1.15fr 1fr;
+        align-items: start;
+      }
+      .card {
+        background: linear-gradient(180deg, var(--card), #11141d);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 20px;
+      }
+      .card h2 {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 1.6px;
+        color: var(--muted); margin: 0 0 14px; font-weight: 600;
+      }
+      .count-card { grid-row: span 4; }
+      .count {
+        font-size: clamp(64px, 12vw, 104px);
+        font-weight: 800; line-height: 1; letter-spacing: -2px;
+        font-variant-numeric: tabular-nums;
+        color: #fff; text-shadow: 0 0 28px rgba(255, 176, 32, 0.28);
+        transition: transform 0.09s ease;
+      }
+      .count.bump { transform: scale(1.05); }
+      .sublabel {
+        margin-top: 6px; font-size: 12px; letter-spacing: 2.4px;
+        text-transform: uppercase; color: var(--accent);
+      }
+      .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+      button {
+        font: inherit; font-size: 14px; color: var(--text);
+        background: var(--card-2); border: 1px solid var(--line);
+        padding: 11px 16px; border-radius: 11px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, transform 0.08s;
+      }
+      button:hover { background: #232a3c; border-color: #38405a; }
+      button:active { transform: translateY(1px); }
+      button.primary {
+        background: var(--accent); color: #1a1205; border-color: var(--accent);
+        font-weight: 700;
+      }
+      button.primary:hover { background: #ffc04d; }
+      button.ghost { background: transparent; }
+      button.danger:hover { color: var(--danger); border-color: var(--danger); }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .row + .row { margin-top: 14px; }
+      .row .k { font-size: 13px; color: var(--muted); }
+      .key {
+        font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+        background: #0d1119; border: 1px solid var(--line);
+        padding: 6px 11px; border-radius: 8px; color: var(--accent);
+      }
+      input[type="text"], input[type="number"], input[type="password"], input[type="search"] {
+        font: inherit; font-size: 13px; color: var(--text);
+        background: #0d1119; border: 1px solid var(--line);
+        padding: 9px 11px; border-radius: 9px; width: 100%;
+      }
+      input:focus { outline: none; border-color: #4a5573; }
+      .field { display: grid; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.1px; }
+      .grid2 { display: grid; grid-template-columns: 1fr 96px; gap: 10px; }
+      .grid2 + .field, .field + .field, .field + .grid2 { margin-top: 12px; }
+      .toggle { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer; }
+      .toggle input { appearance: none; width: 40px; height: 22px; border-radius: 999px; background: #2a3145; position: relative; cursor: pointer; transition: background 0.15s; }
+      .toggle input::after {
+        content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+        border-radius: 50%; background: #8b93a7; transition: transform 0.15s, background 0.15s;
+      }
+      .toggle input:checked { background: rgba(56, 224, 165, 0.3); }
+      .toggle input:checked::after { transform: translateX(18px); background: var(--accent-2); }
+      .overlay-url {
+        display: flex; align-items: center; gap: 10px; margin-top: 12px;
+        background: #0d1119; border: 1px dashed #333c54; border-radius: 10px;
+        padding: 10px 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px;
+        color: var(--accent-2); word-break: break-all;
+      }
+      .hint { font-size: 12px; color: var(--muted); line-height: 1.55; margin: 10px 0 0; }
+      .drink-card { grid-column: 1 / -1; }
+      .picker { display: grid; gap: 10px; }
+      .cats { display: flex; gap: 6px; flex-wrap: wrap; }
+      .cat {
+        font: inherit; font-size: 11.5px; padding: 6px 11px; border-radius: 999px;
+        background: transparent; border: 1px solid var(--line); color: var(--muted);
+        cursor: pointer; letter-spacing: 0.2px;
+      }
+      .cat:hover { color: var(--text); border-color: #38405a; }
+      .cat.active { background: rgba(255, 176, 32, 0.14); border-color: var(--accent); color: var(--accent); }
+      .drinks {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+        gap: 7px; max-height: 330px; overflow-y: auto; padding-right: 4px;
+      }
+      .drinks::-webkit-scrollbar { width: 8px; }
+      .drinks::-webkit-scrollbar-thumb { background: #2c3448; border-radius: 8px; }
+      .drink {
+        display: flex; align-items: center; gap: 9px; justify-content: flex-start;
+        padding: 8px 10px; border-radius: 10px; background: #0d1119;
+        border: 1px solid var(--line); color: var(--text); font-size: 12.5px;
+        cursor: pointer; text-align: left; overflow: hidden;
+      }
+      .drink span.name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .drink:hover { border-color: #38405a; background: #151b28; }
+      .drink.active { border-color: var(--accent); background: rgba(255, 176, 32, 0.1); }
+      .badge {
+        margin-left: auto; font-size: 9.5px; letter-spacing: 0.7px; text-transform: uppercase;
+        color: var(--muted); border: 1px solid var(--line); border-radius: 5px;
+        padding: 1px 4px; flex: none;
+      }
+      .drink.active .badge { color: var(--accent); border-color: rgba(255, 176, 32, 0.4); }
+      .empty { font-size: 12.5px; color: var(--muted); padding: 10px 2px; }
+      .swatch {
+        width: 12px; height: 12px; border-radius: 50%; flex: none;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+      }
+      .drink.active .swatch { box-shadow: 0 0 9px currentColor; }
+      input[type="range"] { width: 100%; accent-color: var(--accent); }
+      .range-row { display: flex; align-items: center; gap: 12px; }
+      .range-val {
+        font-size: 12px; color: var(--muted); width: 38px; text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      #toast {
+        position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+        background: #1c2333; border: 1px solid #333c54; color: var(--text);
+        padding: 10px 16px; border-radius: 10px; font-size: 13px;
+        opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s;
+      }
+      #toast.show { opacity: 1; transform: translate(-50%, 0); }
+      @media (max-width: 780px) { main { grid-template-columns: 1fr; } .count-card { grid-row: auto; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Shot <span>Counter</span></h1>
+      <div class="status"><span class="dot" id="obsDot"></span><span id="obsText">OBS not connected</span></div>
+    </header>
+
+    <main>
+      <section class="card count-card">
+        <h2>Current count</h2>
+        <div class="count" id="count">0</div>
+        <div class="sublabel" id="label">SHOTS</div>
+        <div class="actions">
+          <button class="primary" id="shotBtn">+1 shot</button>
+          <button id="undoBtn" class="ghost">Undo</button>
+          <button id="resetBtn" class="ghost danger">Reset</button>
+        </div>
+        <p class="hint" id="sessionHint">Press your OBS hotkey (<b>Insert</b>) anywhere - even mid-game - and the counter goes up by one.</p>
+      </section>
+
+      <section class="card">
+        <h2>Trigger</h2>
+        <div class="row">
+          <span class="k">Mode</span>
+          <span class="k" id="triggerMode">checking…</span>
+        </div>
+        <div class="row">
+          <span class="k">Key</span>
+          <span class="key" id="triggerKey">Insert</span>
+        </div>
+        <div class="row">
+          <span class="k">Last press</span>
+          <span class="k" id="triggerLast">never</span>
+        </div>
+        <label class="toggle" style="margin-top: 14px">
+          <input type="checkbox" id="offlineToggle" />
+          <span>Run without OBS (local hotkey agent)</span>
+        </label>
+        <p class="hint" id="triggerHint">
+          OBS handles the key by default: <b>Settings → Hotkeys</b>, search <b>Shot Counter Trigger</b>,
+          bind <b>Restart playback</b> to your key. No OBS? Tick the box above and run
+          <b>start.bat</b> (or <b>npm run local-hotkey</b>): the bundled agent registers the same key with
+          Windows and posts to this app. Either way nothing reads the keyboard: no hooks, no polling.
+        </p>
+        <div class="actions">
+          <button id="windowBtn" class="ghost">Open overlay window</button>
+          <button id="triggerSetupBtn" class="ghost">Repair OBS trigger</button>
+        </div>
+        <div class="field" style="margin-top: 14px">
+          <span>Overlay label</span>
+          <input type="text" id="labelInput" maxlength="24" value="SHOTS" />
+        </div>
+      </section>
+
+      <section class="card drink-card">
+        <h2>Drink - <span id="drinkCount">0</span> in the shelf</h2>
+        <div class="picker">
+          <input type="search" id="drinkSearch" placeholder="Search drinks (soju, negroni, somaek…)" />
+          <div class="cats" id="drinkCats"></div>
+          <div class="drinks" id="drinks"></div>
+        </div>
+        <p class="hint">
+          Bottles and glassware change per drink. <b>Shaken</b> drinks rattle a cocktail shaker first
+          (ice + tin SFX, flying ice VFX), then pour; <b>mixed</b> drinks pour a second spirit on top.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Sound</h2>
+        <label class="toggle">
+          <input type="checkbox" id="soundToggle" />
+          <span>Pour sound</span>
+        </label>
+        <div class="field" style="margin-top: 14px">
+          <span>Volume</span>
+          <div class="range-row">
+            <input type="range" id="soundVolume" min="0" max="100" value="75" />
+            <span class="range-val" id="soundVolumeVal">75%</span>
+          </div>
+        </div>
+        <p class="hint">Affects the OBS browser source. It needs audio enabled on the source.</p>
+      </section>
+
+      <section class="card">
+        <h2>OBS WebSocket</h2>
+        <div class="grid2">
+          <div class="field"><span>Host</span><input type="text" id="obsHost" /></div>
+          <div class="field"><span>Port</span><input type="number" id="obsPort" /></div>
+        </div>
+        <div class="field"><span>Password</span><input type="password" id="obsPass" /></div>
+        <div class="row" style="margin-top: 14px">
+          <button class="ghost" id="saveObsBtn">Save &amp; connect</button>
+          <span class="k" id="obsVersion"></span>
+        </div>
+        <label class="toggle" style="margin-top: 14px">
+          <input type="checkbox" id="resetToggle" />
+          <span>Reset count when the stream starts</span>
+        </label>
+      </section>
+
+      <section class="card" style="grid-column: 1 / -1">
+        <h2>Add to OBS</h2>
+        <p class="hint" style="margin-top: 0">
+          In OBS: <b>Sources → + → Browser</b>, paste this URL, set width 480 / height 220. It draws a
+          transparent overlay, so nothing else is needed.
+        </p>
+        <div class="overlay-url">
+          <span id="overlayUrl">http://localhost:4321/overlay</span>
+          <button class="ghost" id="copyBtn" style="padding: 6px 10px; font-size: 12px">Copy</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast"></div>
+
+    <script type="module">
+      import { DRINKS, CATEGORIES } from '/drinks.js';
+
+      const $ = (id) => document.getElementById(id);
+
+      function toast(message) {
+        const el = $('toast');
+        el.textContent = message;
+        el.classList.add('show');
+        clearTimeout(toast.timer);
+        toast.timer = setTimeout(() => el.classList.remove('show'), 1600);
+      }
+
+      function bump() {
+        const el = $('count');
+        el.classList.add('bump');
+        setTimeout(() => el.classList.remove('bump'), 110);
+      }
+
+      const drinksEl = $('drinks');
+      const catsEl = $('drinkCats');
+      const searchEl = $('drinkSearch');
+      $('drinkCount').textContent = DRINKS.length;
+
+      const METHOD_BADGE = { shake: 'shaker', mix: 'mix', build: 'built' };
+      const state = { cat: 'All', query: '', active: null };
+
+      function chooseDrink(id) {
+        fetch('/api/config', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ drink: id }),
+        });
+      }
+
+      function renderShelf() {
+        const query = state.query.trim().toLowerCase();
+        const list = DRINKS.filter((drink) => {
+          if (state.cat !== 'All' && drink.cat !== state.cat) return false;
+          if (!query) return true;
+          return (drink.name + ' ' + drink.cat + ' ' + drink.label + ' ' + drink.sub).toLowerCase().includes(query);
+        });
+
+        drinksEl.textContent = '';
+        if (!list.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'Nothing matches that search.';
+          drinksEl.appendChild(empty);
+          return;
+        }
+
+        for (const drink of list) {
+          const btn = document.createElement('button');
+          btn.className = 'drink' + (drink.id === state.active ? ' active' : '');
+          btn.dataset.id = drink.id;
+          btn.title = drink.name + ' - ' + drink.cat;
+          btn.innerHTML = '<span class="swatch" style="background:' + drink.stream + '"></span><span class="name">' + drink.name + '</span>' + (METHOD_BADGE[drink.method] ? '<span class="badge">' + METHOD_BADGE[drink.method] + '</span>' : '');
+          btn.onclick = () => chooseDrink(drink.id);
+          drinksEl.appendChild(btn);
+        }
+      }
+
+      for (const cat of ['All', ...CATEGORIES]) {
+        const chip = document.createElement('button');
+        chip.className = 'cat' + (cat === 'All' ? ' active' : '');
+        chip.textContent = cat;
+        chip.onclick = () => {
+          state.cat = cat;
+          for (const other of catsEl.children) other.classList.toggle('active', other === chip);
+          renderShelf();
+        };
+        catsEl.appendChild(chip);
+      }
+
+      searchEl.oninput = () => {
+        state.query = searchEl.value;
+        renderShelf();
+      };
+
+      renderShelf();
+
+      function render(s) {
+        if (s.count !== undefined) {
+          const changed = $('count').textContent !== String(s.count);
+          $('count').textContent = s.count;
+          if (changed) bump();
+        }
+        if (s.label !== undefined) {
+          $('label').textContent = s.label;
+          document.title = s.label + ' - Shot Counter';
+          if (document.activeElement !== $('labelInput')) $('labelInput').value = s.label;
+        }
+        if (s.trigger) {
+          const modeText = {
+            obs: 'OBS owns the hotkey',
+            local: 'Offline: local hotkey agent',
+            connecting: 'waiting for OBS',
+          };
+          $('triggerMode').textContent = modeText[s.trigger.mode] || s.trigger.mode;
+          $('triggerKey').textContent = s.trigger.localKey || 'F9';
+          const last = s.trigger.localLastPressAt || s.trigger.lastTriggerAt;
+          $('triggerLast').textContent = last ? new Date(last).toLocaleTimeString() : 'never';
+        }
+        if (s.obs && s.obs.enabled !== undefined) $('offlineToggle').checked = !s.obs.enabled;
+        if (s.drink && s.drink !== state.active) {
+          state.active = s.drink;
+          for (const btn of drinksEl.children) btn.classList.toggle('active', btn.dataset.id === s.drink);
+        }
+        if (s.sound) {
+          $('soundToggle').checked = s.sound.enabled;
+          const pct = Math.round(s.sound.volume * 100);
+          if (document.activeElement !== $('soundVolume')) $('soundVolume').value = pct;
+          $('soundVolumeVal').textContent = pct + '%';
+        }
+        if (s.resetOnStreamStart !== undefined) $('resetToggle').checked = s.resetOnStreamStart;
+        if (s.obs) {
+          if (document.activeElement !== $('obsHost')) $('obsHost').value = s.obs.host || '';
+          if (document.activeElement !== $('obsPort')) $('obsPort').value = s.obs.port || '';
+          if (document.activeElement !== $('obsPass')) $('obsPass').value = s.obs.password || '';
+          const dot = $('obsDot');
+          dot.className = 'dot' + (s.obs.connected ? (s.obs.streaming ? ' live' : ' on') : '');
+          $('obsText').textContent = !s.obs.enabled
+            ? 'Offline mode (no OBS)'
+            : s.obs.connected
+              ? s.obs.streaming
+                ? 'OBS connected - streaming'
+                : 'OBS connected'
+              : 'OBS not connected';
+          $('obsVersion').textContent = s.obs.version ? 'OBS ' + s.obs.version : '';
+        }
+        if (s.canUndo !== undefined) $('undoBtn').disabled = !s.canUndo;
+      }
+
+      let ws;
+      function connect() {
+        ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+        ws.onmessage = (event) => render(JSON.parse(event.data));
+        ws.onclose = () => setTimeout(connect, 1000);
+      }
+      connect();
+
+      const post = (url, body) =>
+        fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+      $('shotBtn').onclick = () => post('/api/shot');
+      $('resetBtn').onclick = () => {
+        if (confirm('Reset the shot count to 0?')) post('/api/reset');
+      };
+
+      $('labelInput').onchange = (event) => post('/api/config', { label: event.target.value.trim() || 'SHOTS' });
+      $('resetToggle').onchange = (event) => post('/api/config', { resetOnStreamStart: event.target.checked });
+
+      $('soundToggle').onchange = (event) => post('/api/config', { sound: { enabled: event.target.checked } });
+      $('soundVolume').oninput = (event) => {
+        $('soundVolumeVal').textContent = event.target.value + '%';
+      };
+      $('soundVolume').onchange = (event) => post('/api/config', { sound: { volume: Number(event.target.value) / 100 } });
+
+      $('saveObsBtn').onclick = () => {
+        post('/api/config', {
+          obs: { host: $('obsHost').value, port: Number($('obsPort').value), password: $('obsPass').value },
+        }).then(() => toast('OBS settings saved'));
+      };
+
+      $('offlineToggle').onchange = (event) => post('/api/config', { obs: { enabled: !event.target.checked } });
+      $('windowBtn').onclick = () => window.open('/window', 'shotCounterWindow', 'width=760,height=560');
+      $('triggerSetupBtn').onclick = () =>
+        post('/api/obs/trigger-setup').then(() => toast('Trigger source checked'));
+
+      $('overlayUrl').textContent = location.origin + '/overlay';
+      $('copyBtn').onclick = async () => {
+        await navigator.clipboard.writeText(location.origin + '/overlay');
+        toast('Overlay URL copied');
+      };
+    </script>
+  </body>
+</html>

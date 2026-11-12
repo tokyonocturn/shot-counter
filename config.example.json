@@ -1,0 +1,19 @@
+{
+  "port": 4321,
+  "label": "SHOTS",
+  "drink": "soju",
+  "sound": {
+    "enabled": true,
+    "volume": 0.75
+  },
+  "resetOnStreamStart": true,
+  "localHotkey": {
+    "key": "F9"
+  },
+  "obs": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 4455,
+    "password": ""
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shot Counter Window</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #0b0d12;
+        overflow: hidden;
+      }
+      iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+      #note {
+        position: fixed;
+        left: 14px;
+        bottom: 12px;
+        max-width: 460px;
+        padding: 8px 12px;
+        border-radius: 9px;
+        border: 1px solid #262c3d;
+        background: rgba(20, 24, 36, 0.92);
+        color: #8b93a7;
+        font: 12px/1.5 "Segoe UI", Inter, system-ui, sans-serif;
+        transition: opacity 0.8s ease;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe src="/overlay" title="Shot counter overlay" allow="autoplay"></iframe>
+    <div id="note">
+      Standalone overlay. Use this window on a second monitor when you are not streaming through OBS.
+      For OBS, add the Browser source pointing at <b>/overlay</b> instead.
+    </div>
+    <script>
+      setTimeout(() => {
+        document.getElementById('note').style.opacity = '0.15';
+      }, 7000);
+    </script>
+  </body>
+</html>

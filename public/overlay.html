@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shot Counter Overlay</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+        color: #fff;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      #stage {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.2vw;
+        height: 100%;
+        padding: 0 2vw;
+      }
+
+      /* ---------------------------------------------------- art */
+      #art {
+        position: relative;
+        height: 92vh;
+        width: auto;
+        max-width: 46vw;
+        overflow: visible;
+        filter: drop-shadow(0 9px 18px rgba(0, 0, 0, 0.42));
+      }
+      #bottle, #shaker {
+        transform-box: fill-box;
+        transform-origin: 50% 100%;
+        transition: transform 0.34s cubic-bezier(0.36, 0.02, 0.34, 1), opacity 0.2s ease;
+      }
+      #bottle.tilt, #shaker.tilt { transform: rotate(-32deg); }
+      #shaker { opacity: 0; }
+      #shaker.on { opacity: 1; }
+      #bottle.away { opacity: 0; }
+      #shakerInner.rattle { animation: rattle 0.1s linear infinite; transform-box: fill-box; transform-origin: 50% 72%; }
+      @keyframes rattle {
+        0% { transform: rotate(-6deg) translate(-4px, 0); }
+        50% { transform: rotate(5deg) translate(4px, -3px); }
+        100% { transform: rotate(-6deg) translate(-4px, 0); }
+      }
+      #liquidGroup {
+        transition: transform 0.42s cubic-bezier(0.28, 0.72, 0.36, 1);
+      }
+      #stream { opacity: 0; transition: opacity 0.1s linear; }
+      #stream.on { opacity: 1; }
+      #streamBar { animation: flow 0.4s linear infinite; }
+      @keyframes flow {
+        from { transform: translateY(-16px); }
+        to { transform: translateY(0); }
+      }
+      #foam { opacity: 0; transition: opacity 0.2s; }
+      #foam.on { opacity: 1; }
+      #fx circle, #fx path { animation: fly var(--dur, 0.7s) ease-out forwards; }
+      @keyframes fly {
+        from { opacity: 0.95; transform: translate(0, 0) scale(1); }
+        to { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, -18px)) scale(0.35); }
+      }
+
+      /* ---------------------------------------------------- count */
+      #info {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #count {
+        font-size: 26vh;
+        font-weight: 800;
+        line-height: 0.84;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+        text-shadow:
+          0 0 46px rgba(255, 176, 32, 0.42),
+          0 7px 28px rgba(0, 0, 0, 0.9),
+          0 0 3px rgba(0, 0, 0, 0.95);
+        transition: transform 0.1s ease-out, color 0.25s ease-out;
+        transform-origin: 50% 60%;
+      }
+      #count.pop { transform: scale(1.09); }
+      #count.flash { color: #ffd479; }
+      #label {
+        margin-top: 1vh;
+        font-size: 4.7vh;
+        font-weight: 700;
+        letter-spacing: 0.4em;
+        text-indent: 0.4em;
+        text-transform: uppercase;
+        color: #ffb020;
+        text-shadow: 0 3px 14px rgba(0, 0, 0, 0.92), 0 0 22px rgba(255, 176, 32, 0.35);
+      }
+      #bar {
+        margin-top: 1.1vh;
+        width: 84%;
+        height: 3px;
+        border-radius: 3px;
+        background: linear-gradient(90deg, transparent, #ffb020 50%, transparent);
+        opacity: 0.9;
+      }
+      #brand {
+        margin-top: 1vh;
+        font-size: 2.2vh;
+        font-weight: 600;
+        letter-spacing: 0.26em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.82);
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 0, 0, 0.7);
+        max-width: 34vw;
+        text-align: center;
+      }
+      #art, #info { opacity: 0; animation: fade 0.55s ease-out 0.1s forwards; }
+      @keyframes fade { to { opacity: 1; } }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <svg id="art" viewBox="0 0 260 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="liquidGrad" x1="0" y1="0" x2="0" y2="1"></linearGradient>
+          <linearGradient id="glassGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.2" />
+            <stop offset="0.42" stop-color="#ffffff" stop-opacity="0.05" />
+            <stop offset="1" stop-color="#ffffff" stop-opacity="0.17" />
+          </linearGradient>
+          <linearGradient id="bottleShade" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.26" />
+            <stop offset="0.34" stop-color="#ffffff" stop-opacity="0" />
+            <stop offset="1" stop-color="#000000" stop-opacity="0.34" />
+          </linearGradient>
+          <linearGradient id="metalGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#f2f6f8" />
+            <stop offset="0.28" stop-color="#c2ccd4" />
+            <stop offset="0.58" stop-color="#8e9aa4" />
+            <stop offset="0.82" stop-color="#c8d2da" />
+            <stop offset="1" stop-color="#7d8892" />
+          </linearGradient>
+          <clipPath id="glassClip"><path d="" /></clipPath>
+        </defs>
+
+        <!-- table shadow -->
+        <ellipse id="tableShadow" cx="95" cy="286" rx="58" ry="6" fill="rgba(0,0,0,0.32)" />
+
+        <!-- glass (built per drink) -->
+        <g id="glassGroup"></g>
+
+        <!-- liquid clipped to the glass -->
+        <g clip-path="url(#glassClip)">
+          <g id="liquidGroup">
+            <rect id="liquidRect" x="38" y="176" width="114" height="116" fill="url(#liquidGrad)" />
+            <ellipse id="liquidSurface" cx="95" cy="176" rx="49" ry="5" fill="#ffffff" opacity="0.26" />
+            <g id="foam"></g>
+          </g>
+        </g>
+
+        <!-- pour stream (over the glass, under the bottle) -->
+        <g id="stream">
+          <rect id="streamBar" x="74" y="122" width="10" height="104" rx="5" fill="#dff6ff" stroke="rgba(0,0,0,0.2)" stroke-width="1.2" />
+        </g>
+
+        <!-- clean hands: the shaker only appears for shaken drinks -->
+        <g id="shaker">
+          <g id="shakerInner">
+            <rect class="spout" x="192" y="116" width="26" height="15" rx="3.5" fill="#c9d3da" />
+            <rect x="192" y="124" width="26" height="4" fill="#7d8892" opacity="0.7" />
+            <path d="M181 134 L229 134 L234 212 Q234 221 225 221 L185 221 Q176 221 176 212 Z" fill="url(#metalGrad)" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.2" />
+            <ellipse cx="205" cy="134" rx="24" ry="5" fill="#eef3f6" opacity="0.85" />
+            <path d="M186 146 L188 208" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" opacity="0.5" />
+            <path d="M224 146 L222 204" stroke="#000000" stroke-width="2.6" stroke-linecap="round" opacity="0.18" />
+            <text x="205" y="186" font-family="Segoe UI, Arial, sans-serif" font-size="7" font-weight="700" fill="#5b6672" text-anchor="middle" letter-spacing="1.4">SHAKE</text>
+          </g>
+        </g>
+
+        <!-- bottle (built per drink) -->
+        <g id="bottle"></g>
+
+        <!-- garnish sits on the rim, above everything -->
+        <g id="garnish"></g>
+
+        <!-- particles -->
+        <g id="fx"></g>
+      </svg>
+
+      <div id="info">
+        <div id="count">0</div>
+        <div id="label">SHOTS</div>
+        <div id="bar"></div>
+        <div id="brand">Jinro Chamisul</div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { getDrink, DEFAULT_DRINK } from './drinks.js';
+
+      const FONT = `font-family="Segoe UI, Arial, sans-serif"`;
+      const $ = (id) => document.getElementById(id);
+
+      /* ------------------------------------------------------------- glassware */
+      const GLASSES = {
+        shot: {
+          body: (d) => `
+            <path d="M40 170 L150 170 L138 276 Q137 282 131 282 L59 282 Q53 282 52 276 Z" fill="url(#glassGrad)" stroke="rgba(255,255,255,0.64)" stroke-width="2.6" stroke-linejoin="round" />
+            <ellipse cx="95" cy="170" rx="55" ry="7" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.2" />
+            <path d="M55 279 L135 279" stroke="rgba(255,255,255,0.55)" stroke-width="4" stroke-linecap="round" />
+            <path d="M55 190 L62 256" stroke="rgba(255,255,255,0.5)" stroke-width="3.4" stroke-linecap="round" />
+            <path d="M136 186 L131 244" stroke="rgba(255,255,255,0.18)" stroke-width="2.6" stroke-linecap="round" />
+            <path d="M70 236 L78 236" stroke="rgba(255,255,255,0.35)" stroke-width="1.6" stroke-linecap="round" />`,
+          clip: 'M46 176 L144 176 L133 274 Q132 278 127 278 L63 278 Q58 278 57 274 Z',
+          rect: { x: 38, y: 176, w: 114, h: 116 },
+          rest: 96, filled: 46,
+          surface: { cx: 95, cy: 176, rx: 49, ry: 5 },
+          rim: { cx: 95, cy: 170, rx: 55, ry: 7 },
+          shadow: { cx: 95, cy: 286, rx: 58 },
+        },
+        rocks: {
+          body: (d) => `
+            <path d="M28 196 L162 196 L154 276 Q153 283 146 283 L44 283 Q37 283 36 276 Z" fill="url(#glassGrad)" stroke="rgba(255,255,255,0.64)" stroke-width="2.8" stroke-linejoin="round" />
+            <ellipse cx="95" cy="196" rx="67" ry="8" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.4" />
+            <path d="M44 280 L146 280" stroke="rgba(255,255,255,0.6)" stroke-width="6" stroke-linecap="round" />
+            <path d="M42 216 L50 268" stroke="rgba(255,255,255,0.45)" stroke-width="3.4" stroke-linecap="round" />
+            <path d="M150 212 L144 258" stroke="rgba(255,255,255,0.16)" stroke-width="2.6" stroke-linecap="round" />`,
+          clip: 'M34 202 L156 202 L149 274 Q148 279 142 279 L48 279 Q42 279 41 274 Z',
+          rect: { x: 26, y: 202, w: 138, h: 112 },
+          rest: 92, filled: 40,
+          surface: { cx: 95, cy: 202, rx: 61, ry: 6 },
+          rim: { cx: 95, cy: 196, rx: 67, ry: 8 },
+          shadow: { cx: 95, cy: 286, rx: 72 },
+        },
+        highball: {
+          body: (d) => `
+            <path d="M52 112 L138 112 L134 274 Q133 282 126 282 L64 282 Q57 282 56 274 Z" fill="url(#glassGrad)" stroke="rgba(255,255,255,0.64)" stroke-width="2.6" stroke-linejoin="round" />
+            <ellipse cx="95" cy="112" rx="43" ry="6" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.2" />
+            <path d="M62 279 L128 279" stroke="rgba(255,255,255,0.55)" stroke-width="5" stroke-linecap="round" />
+            <path d="M62 132 L68 250" stroke="rgba(255,255,255,0.45)" stroke-width="3" stroke-linecap="round" />
+            <path d="M128 132 L124 236" stroke="rgba(255,255,255,0.15)" stroke-width="2.4" stroke-linecap="round" />`,
+          clip: 'M58 118 L132 118 L129 272 Q128 278 122 278 L68 278 Q62 278 61 272 Z',
+          rect: { x: 46, y: 118, w: 98, h: 164 },
+          rest: 148, filled: 86,
+          surface: { cx: 95, cy: 118, rx: 37, ry: 4.5 },
+          rim: { cx: 95, cy: 112, rx: 43, ry: 6 },
+          shadow: { cx: 95, cy: 286, rx: 48 },
+        },
+        martini: {
+          body: (d) => `
+            <path d="M30 150 L160 150 L100 233 Q95 240 90 233 Z" fill="url(#glassGrad)" stroke="rgba(255,255,255,0.64)" stroke-width="2.6" stroke-linejoin="round" />
+            <ellipse cx="95" cy="150" rx="65" ry="6" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.2" />
+            <path d="M95 233 L95 272" stroke="rgba(255,255,255,0.5)" stroke-width="4.5" stroke-linecap="round" />
+            <ellipse cx="95" cy="275" rx="32" ry="5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="3" />
+            <path d="M42 158 L92 226" stroke="rgba(255,255,255,0.3)" stroke-width="2.6" stroke-linecap="round" />`,
+          clip: 'M36 154 L154 154 L99 229 Q95 234 91 229 Z',
+          rect: { x: 28, y: 154, w: 138, h: 82 },
+          rest: 78, filled: 30,
+          surface: { cx: 95, cy: 154, rx: 62, ry: 5 },
+          rim: { cx: 95, cy: 150, rx: 65, ry: 6 },
+          shadow: { cx: 95, cy: 280, rx: 44 },
+        },
+        coupe: {
+          body: (d) => `
+            <path d="M36 150 L154 150 Q152 214 95 224 Q38 214 36 150 Z" fill="url(#glassGrad)" stroke="rgba(255,255,255,0.64)" stroke-width="2.6" stroke-linejoin="round" />
+            <ellipse cx="95" cy="150" rx="59" ry="6" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.2" />
+            <path d="M95 222 L95 271" stroke="rgba(255,255,255,0.5)" stroke-width="4" stroke-linecap="round" />
+            <ellipse cx="95" cy="275" rx="30" ry="5" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="3" />
+            <path d="M48 162 Q54 202 84 216" stroke="rgba(255,255,255,0.3)" stroke-width="2.6" stroke-linecap="round" />`,
+          clip: 'M41 155 L149 155 Q147 209 95 218 Q43 209 41 155 Z',
+          rect: { x: 36, y: 155, w: 118, h: 68 },
+          rest: 68, filled: 30,
+          surface: { cx: 95, cy: 155, rx: 55, ry: 5 },
+          rim: { cx: 95, cy: 150, rx: 59, ry: 6 },
+          shadow: { cx: 95, cy: 280, rx: 40 },
+        },
+      };
+
+      /* --------------------------------------------------------------- bottles */
+      const label = (d, x, y, w, size, subSize) => `
+        <rect x="${x}" y="${y}" width="${w}" height="${size + subSize + 14}" rx="2" fill="${d.labelBg}" opacity="0.97" />
+        <text x="${x + w / 2}" y="${y + 11}" ${FONT} font-size="${size}" font-weight="700" fill="${d.labelInk}" text-anchor="middle" letter-spacing="0.4">${d.label}</text>
+        <text x="${x + w / 2}" y="${y + 11 + subSize + 4}" ${FONT} font-size="${subSize}" font-weight="600" fill="${d.subInk}" text-anchor="middle" letter-spacing="0.7">${d.sub}</text>`;
+
+      const BOTTLES = {
+        slim: (d) => `
+          <rect x="183" y="150" width="44" height="120" rx="9" fill="${d.body}" />
+          <rect x="183" y="150" width="44" height="120" rx="9" fill="url(#bottleShade)" />
+          <path d="M191 152 L219 152 L213 120 L211 100 L199 100 L197 120 Z" fill="${d.body}" />
+          <path d="M191 152 L219 152 L213 120 L211 100 L199 100 L197 120 Z" fill="url(#bottleShade)" />
+          <rect x="197" y="100" width="16" height="52" rx="3" fill="${d.body}" />
+          <rect x="197" y="100" width="16" height="52" rx="3" fill="url(#bottleShade)" />
+          <rect class="spout" x="193" y="88" width="24" height="13" rx="2.5" fill="${d.cap}" />
+          ${label(d, 185, 188, 40, 8.2, 4.4)}`,
+        longneck: (d) => `
+          <path d="M183 270 L183 190 Q183 179 192 175 L198 172 L198 120 Q198 112 205 112 Q212 112 212 120 L212 172 L218 175 Q227 179 227 190 L227 270 Z" fill="${d.body}" />
+          <path d="M183 270 L183 190 Q183 179 192 175 L198 172 L198 120 Q198 112 205 112 Q212 112 212 120 L212 172 L218 175 Q227 179 227 190 L227 270 Z" fill="url(#bottleShade)" />
+          <rect class="spout" x="196" y="104" width="18" height="17" rx="2.5" fill="${d.cap}" />
+          <rect x="196" y="117" width="18" height="3" fill="rgba(0,0,0,0.2)" />
+          ${label(d, 184, 196, 42, 9.4, 4.4)}`,
+        square: (d) => `
+          <rect x="178" y="178" width="54" height="92" rx="4" fill="${d.body}" />
+          <rect x="178" y="178" width="54" height="92" rx="4" fill="url(#bottleShade)" />
+          <rect x="197" y="120" width="16" height="60" rx="3" fill="${d.body}" />
+          <rect x="197" y="120" width="16" height="60" rx="3" fill="url(#bottleShade)" />
+          <rect class="spout" x="193" y="104" width="24" height="17" rx="2" fill="${d.cap}" />
+          <rect x="193" y="118" width="24" height="3" rx="1.5" fill="rgba(255,255,255,0.25)" />
+          ${label(d, 180, 192, 50, 8.4, 4.4)}`,
+        squat: (d) => `
+          <ellipse cx="205" cy="230" rx="33" ry="40" fill="${d.body}" />
+          <ellipse cx="205" cy="230" rx="33" ry="40" fill="url(#bottleShade)" />
+          <path d="M172 230 Q172 192 205 192 Q238 192 238 230 Z" fill="${d.bodyDark}" opacity="0.18" />
+          <rect x="197" y="120" width="16" height="74" fill="${d.body}" />
+          <rect x="197" y="120" width="16" height="74" fill="url(#bottleShade)" />
+          <rect class="spout" x="192" y="106" width="26" height="15" rx="3" fill="${d.cap}" />
+          <rect x="176" y="212" width="58" height="34" rx="3" fill="${d.labelBg}" opacity="0.95" />
+          <text x="205" y="228" ${FONT} font-size="5.4" font-weight="700" fill="${d.labelInk}" text-anchor="middle" letter-spacing="0.3">${d.label}</text>
+          <text x="205" y="237" ${FONT} font-size="3.8" fill="${d.subInk}" text-anchor="middle" letter-spacing="1">${d.sub}</text>`,
+        tall: (d) => `
+          <path d="M180 268 L180 202 Q180 190 190 183 L197 177 L197 138 Q197 130 205 130 Q213 130 213 138 L213 177 L220 183 Q230 190 230 202 L230 268 Z" fill="${d.body}" />
+          <path d="M180 268 L180 202 Q180 190 190 183 L197 177 L197 138 Q197 130 205 130 Q213 130 213 138 L213 177 L220 183 Q230 190 230 202 L230 268 Z" fill="url(#bottleShade)" />
+          <rect x="195" y="118" width="20" height="24" fill="${d.cap}" />
+          <rect x="195" y="132" width="20" height="4" fill="rgba(0,0,0,0.22)" />
+          ${label(d, 181, 206, 48, 7.4, 4)}`,
+        can: (d) => `
+          <rect x="182" y="148" width="46" height="120" rx="6" fill="${d.body}" />
+          <rect x="182" y="148" width="46" height="120" rx="6" fill="url(#bottleShade)" />
+          <ellipse cx="205" cy="150" rx="23" ry="5" fill="${d.bodyDark}" />
+          <rect x="196" y="144" width="18" height="8" rx="3" fill="${d.cap}" />
+          <ellipse cx="205" cy="266" rx="23" ry="5" fill="${d.bodyDark}" opacity="0.55" />
+          ${label(d, 183, 186, 44, 8.6, 4.2)}`,
+      };
+
+      /* -------------------------------------------------------------- garnish */
+      function garnishMarkup(drink, g) {
+        const { cx, cy, rx } = g.rim;
+        const kind = drink.garnish;
+        const salt = drink.salt
+          ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${g.rim.ry + 1}" fill="none" stroke="#ffffff" stroke-width="4" stroke-dasharray="2 3" opacity="0.9" />`
+          : '';
+        if (!kind) return salt;
+        if (kind === 'lime' || kind === 'lemon' || kind === 'orange') {
+          const fill = kind === 'lime' ? '#7cc23c' : kind === 'lemon' ? '#f2d43c' : '#f2913c';
+          const inner = kind === 'lime' ? '#dff2b0' : kind === 'lemon' ? '#fdf3b8' : '#ffd9a8';
+          const x = cx + rx - 12;
+          const y = cy - 8;
+          return `<g transform="rotate(-18 ${x} ${y})">
+            <circle cx="${x}" cy="${y}" r="13" fill="${fill}" stroke="${inner}" stroke-width="1.6" />
+            <circle cx="${x}" cy="${y}" r="9" fill="${inner}" opacity="0.92" />
+            ${[0, 45, 90, 135].map((a) => `<path d="M${x - 8 * Math.cos((a * Math.PI) / 180)} ${y - 8 * Math.sin((a * Math.PI) / 180)} L${x + 8 * Math.cos((a * Math.PI) / 180)} ${y + 8 * Math.sin((a * Math.PI) / 180)}" stroke="${fill}" stroke-width="1.5" opacity="0.75" />`).join('')}
+          </g>`;
+        }
+        if (kind === 'cherry') {
+          const x = cx + rx - 14;
+          const y = cy - 6;
+          return `<g>
+            <path d="M${x} ${y - 7} Q${x + 6} ${y - 20} ${x + 14} ${y - 24}" stroke="#4a7a2a" stroke-width="2" fill="none" stroke-linecap="round" />
+            <circle cx="${x}" cy="${y}" r="8.5" fill="#c4102a" />
+            <circle cx="${x - 3}" cy="${y - 3}" r="2.6" fill="#ff8fa0" opacity="0.7" />
+          </g>`;
+        }
+        if (kind === 'olive') {
+          const x = cx + 8;
+          const y = cy - 2;
+          return `<g>
+            <path d="M${x} ${y} L${x + 14} ${y - 16}" stroke="#c9a24a" stroke-width="1.8" stroke-linecap="round" />
+            <ellipse cx="${x}" cy="${y}" rx="8" ry="6.5" fill="#6f8a2a" />
+            <circle cx="${x}" cy="${y}" r="2.6" fill="#c4302a" />
+          </g>`;
+        }
+        if (kind === 'mint') {
+          const x = cx + rx - 18;
+          const baseY = cy - 4;
+          const leaf = (dx, dy, rot, scale) =>
+            `<path transform="translate(${x + dx} ${baseY + dy}) rotate(${rot}) scale(${scale})" d="M0 0 Q7 -13 0 -26 Q-7 -13 0 0 Z" fill="#3f8a3a" stroke="#2a6b28" stroke-width="0.9" />`;
+          return `<g>
+            <path d="M${x} ${baseY + 6} L${x - 2} ${baseY - 8}" stroke="#2a6b28" stroke-width="1.8" stroke-linecap="round" />
+            ${leaf(0, 0, -18, 1)}${leaf(2, -2, 22, 0.95)}${leaf(-1, -8, 2, 0.8)}
+          </g>`;
+        }
+        return salt;
+      }
+
+      /* ---------------------------------------------------------------- dom */
+      const art = $('art');
+      const bottleEl = $('bottle');
+      const shakerEl = $('shaker');
+      const shakerInner = $('shakerInner');
+      const glassGroup = $('glassGroup');
+      const glassClip = $('glassClip');
+      const liquidGroup = $('liquidGroup');
+      const liquidRect = $('liquidRect');
+      const liquidSurface = $('liquidSurface');
+      const gradEl = $('liquidGrad');
+      const foamEl = $('foam');
+      const streamEl = $('stream');
+      const streamBar = $('streamBar');
+      const garnishEl = $('garnish');
+      const fxEl = $('fx');
+      const shadowEl = $('tableShadow');
+      const countEl = $('count');
+      const labelEl = $('label');
+      const brandEl = $('brand');
+
+      let drinkKey = null;
+      let drink = null;
+      let glass = null;
+      let current = null;
+
+      function applyDrink(id) {
+        drink = getDrink(id);
+        drinkKey = drink.id;
+        glass = GLASSES[drink.glass] || GLASSES.highball;
+
+        glassGroup.innerHTML = glass.body(drink);
+        glassClip.querySelector('path').setAttribute('d', glass.clip);
+        liquidRect.setAttribute('x', glass.rect.x);
+        liquidRect.setAttribute('y', glass.rect.y);
+        liquidRect.setAttribute('width', glass.rect.w);
+        liquidRect.setAttribute('height', glass.rect.h);
+        liquidSurface.setAttribute('cx', glass.surface.cx);
+        liquidSurface.setAttribute('cy', glass.surface.cy);
+        liquidSurface.setAttribute('rx', glass.surface.rx);
+        liquidSurface.setAttribute('ry', glass.surface.ry);
+        shadowEl.setAttribute('cx', glass.shadow.cx);
+        shadowEl.setAttribute('rx', glass.shadow.rx);
+        liquidGroup.style.transform = `translateY(${glass.rest}px)`;
+
+        gradEl.innerHTML = [
+          `<stop offset="0" stop-color="${drink.liquid[0]}" />`,
+          `<stop offset="0.2" stop-color="${drink.liquid[1]}" />`,
+          `<stop offset="1" stop-color="${drink.liquid[2]}" />`,
+        ].join('');
+        streamBar.setAttribute('fill', drink.stream);
+
+        // foam head (beer, shaken sours)
+        foamEl.innerHTML = drink.foam
+          ? `<ellipse cx="${glass.surface.cx}" cy="${glass.surface.cy}" rx="${glass.surface.rx}" ry="${glass.surface.ry + 2}" fill="#fffaf0" opacity="0.92" />
+             <ellipse cx="${glass.surface.cx - 14}" cy="${glass.surface.cy - 3}" rx="10" ry="4" fill="#ffffff" opacity="0.8" />
+             <ellipse cx="${glass.surface.cx + 16}" cy="${glass.surface.cy - 2}" rx="8" ry="3.4" fill="#ffffff" opacity="0.7" />`
+          : '';
+
+        bottleEl.innerHTML = (BOTTLES[drink.bottle] || BOTTLES.slim)(drink);
+        garnishEl.innerHTML = garnishMarkup(drink, glass);
+        brandEl.textContent = drink.name;
+        resetPose();
+      }
+
+      // Measure where the pour actually leaves the spout (works for every bottle
+      // shape and for the tilted pose) and run the stream into the glass rim.
+      function placeStream(sourceEl) {
+        const spout = sourceEl.querySelector('.spout');
+        if (!spout || !art.getScreenCTM) return;
+        const box = spout.getBoundingClientRect();
+        const point = art.createSVGPoint();
+        point.x = box.left + box.width / 2;
+        point.y = box.top + box.height / 2;
+        const p = point.matrixTransform(art.getScreenCTM().inverse());
+        const top = p.y - 6;
+        streamBar.setAttribute('x', (p.x - 5).toFixed(1));
+        streamBar.setAttribute('y', top.toFixed(1));
+        streamBar.setAttribute('height', Math.max(18, glass.surface.cy + 26 - top).toFixed(1));
+      }
+
+      /* --------------------------------------------------------------- vfx */
+      const particles = [];
+      function fly(spec) {
+        const { cx, cy, r, color, dx, dy, dur, opacity } = spec;
+        const node = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        node.setAttribute('cx', cx.toFixed(1));
+        node.setAttribute('cy', cy.toFixed(1));
+        node.setAttribute('r', r.toFixed(1));
+        node.setAttribute('fill', color);
+        if (opacity !== undefined) node.setAttribute('opacity', String(opacity));
+        node.style.setProperty('--dx', `${dx}px`);
+        node.style.setProperty('--dy', `${dy}px`);
+        node.style.setProperty('--dur', `${dur}ms`);
+        fxEl.appendChild(node);
+        particles.push(node);
+        setTimeout(() => node.remove(), dur + 80);
+      }
+
+      // droplets kicked up where the stream meets the liquid
+      function splash(count = 6) {
+        for (let i = 0; i < count; i += 1) {
+          fly({
+            cx: glass.surface.cx + (Math.random() - 0.5) * glass.surface.rx * 1.1,
+            cy: glass.surface.cy + 2,
+            r: 1.2 + Math.random() * 2.2,
+            color: drink.stream,
+            dx: (Math.random() - 0.5) * 34,
+            dy: -14 - Math.random() * 26,
+            dur: 420 + Math.random() * 260,
+            opacity: 0.9,
+          });
+        }
+      }
+
+      // crushed ice flying out of the shaker
+      function iceBurst() {
+        for (let i = 0; i < 10; i += 1) {
+          fly({
+            cx: 200 + (Math.random() - 0.5) * 40,
+            cy: 140 + Math.random() * 50,
+            r: 1.6 + Math.random() * 2.8,
+            color: i % 3 === 0 ? '#ffffff' : '#e3f2fb',
+            dx: (Math.random() - 0.5) * 70,
+            dy: -20 - Math.random() * 40,
+            dur: 420 + Math.random() * 320,
+            opacity: 0.85,
+          });
+        }
+        for (let i = 0; i < 5; i += 1) {
+          fly({
+            cx: 205,
+            cy: 150 + Math.random() * 40,
+            r: 3 + Math.random() * 3,
+            color: '#cfe6f5',
+            dx: (Math.random() - 0.5) * 56,
+            dy: -16 - Math.random() * 24,
+            dur: 520,
+            opacity: 0.35,
+          });
+        }
+      }
+
+      // carbonation sparkle for beer / sparkling wine
+      function fizzBurst() {
+        for (let i = 0; i < 8; i += 1) {
+          fly({
+            cx: glass.surface.cx + (Math.random() - 0.5) * glass.surface.rx * 1.6,
+            cy: glass.surface.cy + 24 + Math.random() * 40,
+            r: 1 + Math.random() * 1.8,
+            color: '#ffffff',
+            dx: (Math.random() - 0.5) * 8,
+            dy: -24 - Math.random() * 26,
+            dur: 620 + Math.random() * 320,
+            opacity: 0.6,
+          });
+        }
+      }
+
+      /* ---------------------------------------------------------------- audio */
+      const Sound = {
+        ctx: null,
+        master: null,
+        noise: null,
+        enabled: true,
+        volume: 0.75,
+        ensure() {
+          if (!this.ctx) {
+            const Ctor = window.AudioContext || window.webkitAudioContext;
+            if (!Ctor) return null;
+            this.ctx = new Ctor();
+            this.master = this.ctx.createGain();
+            this.master.gain.value = this.enabled ? this.volume : 0;
+            this.master.connect(this.ctx.destination);
+            const len = Math.floor(this.ctx.sampleRate * 1.6);
+            const buffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < len; i += 1) data[i] = Math.random() * 2 - 1;
+            this.noise = buffer;
+          }
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          return this.ctx;
+        },
+        configure(enabled, volume) {
+          this.enabled = Boolean(enabled);
+          this.volume = Math.max(0, Math.min(1, Number(volume)));
+          if (this.master) this.master.gain.value = this.enabled ? this.volume : 0;
+          if (this.enabled) this.ensure();
+        },
+        blip(freq, duration, gain, type, at) {
+          const o = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          o.type = type;
+          o.frequency.setValueAtTime(freq, at);
+          g.gain.setValueAtTime(gain, at);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+          o.connect(g);
+          g.connect(this.master);
+          o.start(at);
+          o.stop(at + duration + 0.02);
+        },
+        glug(freq, duration, at) {
+          const o = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          const lp = this.ctx.createBiquadFilter();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, at);
+          o.frequency.exponentialRampToValueAtTime(freq * 1.8, at + duration);
+          lp.type = 'lowpass';
+          lp.frequency.value = 900;
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime(0.16, at + duration * 0.3);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+          o.connect(lp);
+          lp.connect(g);
+          g.connect(this.master);
+          o.start(at);
+          o.stop(at + duration + 0.03);
+        },
+        noiseBurst({ at, duration, freq, q, gain }) {
+          const src = this.ctx.createBufferSource();
+          src.buffer = this.noise;
+          src.loop = true;
+          const bp = this.ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.value = freq;
+          bp.Q.value = q;
+          const g = this.ctx.createGain();
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime(gain, at + duration * 0.18);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+          src.connect(bp);
+          bp.connect(g);
+          g.connect(this.master);
+          src.start(at);
+          src.stop(at + duration + 0.04);
+        },
+        pour(duration) {
+          if (!this.enabled) return 'muted';
+          const ctx = this.ensure();
+          if (!ctx) return 'unsupported';
+          if (ctx.state !== 'running') return ctx.state;
+
+          const t = ctx.currentTime + 0.01;
+          const src = ctx.createBufferSource();
+          src.buffer = this.noise;
+          src.loop = true;
+          const bp = ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.Q.value = 0.85;
+          bp.frequency.setValueAtTime(620, t);
+          bp.frequency.linearRampToValueAtTime(2300, t + duration * 0.3);
+          bp.frequency.linearRampToValueAtTime(1150, t + duration);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.3, t + 0.09);
+          g.gain.setValueAtTime(0.3, t + duration * 0.68);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+          src.connect(bp);
+          bp.connect(g);
+          g.connect(this.master);
+          src.start(t);
+          src.stop(t + duration + 0.06);
+
+          this.blip(2640 + Math.random() * 160, 0.14, 0.13, 'triangle', t);
+          this.blip(3960 + Math.random() * 200, 0.08, 0.06, 'sine', t + 0.005);
+
+          const glugs = Math.max(3, Math.round(duration * 5));
+          for (let i = 0; i < glugs; i += 1) {
+            const at = t + 0.1 + (i / glugs) * duration * 0.8 + Math.random() * 0.035;
+            this.glug(170 + Math.random() * 150, 0.08 + Math.random() * 0.06, at);
+          }
+          return ctx.state;
+        },
+        shake(duration) {
+          if (!this.enabled) return 'muted';
+          const ctx = this.ensure();
+          if (!ctx) return 'unsupported';
+          if (ctx.state !== 'running') return ctx.state;
+
+          const t = ctx.currentTime + 0.01;
+          // ice rattling against the tin: a string of short noise bursts
+          const bursts = 9;
+          for (let i = 0; i < bursts; i += 1) {
+            this.noiseBurst({
+              at: t + (i / bursts) * duration,
+              duration: 0.045 + Math.random() * 0.03,
+              freq: 2400 + Math.random() * 1800,
+              q: 1.4,
+              gain: 0.16 + Math.random() * 0.07,
+            });
+            if (i % 2 === 0) {
+              this.blip(1900 + Math.random() * 2200, 0.035, 0.08, 'triangle', t + (i / bursts) * duration);
+            }
+          }
+          this.noiseBurst({ at: t, duration, freq: 900, q: 0.6, gain: 0.05 });
+          // metal cap seated on the tin
+          this.blip(3150, 0.12, 0.1, 'sine', t + duration);
+          this.blip(4700, 0.07, 0.05, 'sine', t + duration + 0.004);
+          return ctx.state;
+        },
+        fizz(duration) {
+          if (!this.enabled) return 'muted';
+          const ctx = this.ensure();
+          if (!ctx) return 'unsupported';
+          if (ctx.state !== 'running') return ctx.state;
+          const t = ctx.currentTime + 0.01;
+          this.noiseBurst({ at: t, duration, freq: 4200, q: 0.5, gain: 0.06 });
+          for (let i = 0; i < 5; i += 1) {
+            this.blip(2200 + Math.random() * 2400, 0.03, 0.035, 'sine', t + 0.1 + Math.random() * duration);
+          }
+          return ctx.state;
+        },
+      };
+
+      function reportAudio(state, kind) {
+        if (!ws || ws.readyState !== 1) return;
+        ws.send(JSON.stringify({ type: 'audio', state, kind, drink: drinkKey, count: current, queued: queue.length }));
+      }
+
+      /* ---------------------------------------------------------------- queue */
+      const queue = [];
+      let pouring = false;
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      function enqueuePour() {
+        queue.push(1);
+        pumpQueue();
+      }
+
+      async function pumpQueue() {
+        if (pouring) return;
+        pouring = true;
+        try {
+          while (queue.length) {
+            queue.shift();
+            const backlog = queue.length;
+            const speed = backlog >= 3 ? 0.5 : backlog >= 1 ? 0.72 : 1;
+            await serveOnce(speed);
+          }
+        } catch (error) {
+          console.error('pour failed', error);
+          queue.length = 0;
+        } finally {
+          pouring = false;
+        }
+      }
+
+      async function serveOnce(speed) {
+        if (drink.method === 'shake') return shakeSequence(speed);
+        if (drink.method === 'mix') return mixSequence(speed);
+        return bottlePour(speed);
+      }
+
+      // a drink switch can land mid-animation: park everything back at rest
+      function resetPose() {
+        bottleEl.classList.remove('tilt', 'away');
+        shakerEl.classList.remove('tilt', 'on');
+        shakerInner.classList.remove('rattle');
+        streamEl.classList.remove('on');
+        liquidGroup.classList.remove('filled');
+        liquidGroup.style.transform = `translateY(${glass.rest}px)`;
+        foamEl.classList.remove('on');
+        void bottleEl.getBoundingClientRect();
+      }
+
+      async function bottlePour(speed, options = {}) {
+        const ms = (v) => Math.round(v * speed);
+        const source = options.source || bottleEl;
+        const color = options.color || drink.stream;
+
+        source.classList.remove('tilt');
+        streamEl.classList.remove('on');
+        void source.getBoundingClientRect();
+        source.classList.add('tilt');
+        await wait(ms(320));
+
+        placeStream(source);
+        streamBar.setAttribute('fill', color);
+        streamEl.classList.add('on');
+        liquidGroup.style.transform = `translateY(${glass.filled}px)`;
+        if (drink.foam) foamEl.classList.add('on');
+        // audio must never be able to stall the pour
+        let soundState;
+        try {
+          soundState = Sound.pour(0.82 * speed);
+        } catch (error) {
+          console.error('pour sound failed', error);
+          soundState = 'error';
+        }
+        reportAudio(soundState, 'pour');
+        splash(drink.foam ? 8 : 6);
+        await wait(ms(430));
+
+        streamEl.classList.remove('on');
+        source.classList.remove('tilt');
+        if (drink.foam) fizzBurst();
+        await wait(ms(300));
+
+        liquidGroup.style.transform = `translateY(${glass.rest}px)`;
+        await wait(ms(400));
+      }
+
+      async function mixSequence(speed) {
+        const ms = (v) => Math.round(v * speed);
+        await bottlePour(speed, { color: drink.stream });
+        // the second spirit goes in on top: shorter pour, second colour
+        if (drink.second) {
+          await wait(ms(90));
+          await bottlePour(Math.max(0.42, speed * 0.55), { color: drink.second });
+          reportAudio('running', 'mix');
+          splash(5);
+          if (drink.foam) fizzBurst();
+        }
+      }
+
+      async function shakeSequence(speed) {
+        const ms = (v) => Math.round(v * speed);
+        shakerEl.classList.add('on');
+        bottleEl.classList.add('away');
+        await wait(ms(160));
+
+        shakerInner.classList.add('rattle');
+        let shakeState;
+        try {
+          shakeState = Sound.shake(0.5 * speed);
+        } catch (error) {
+          console.error('shake sound failed', error);
+          shakeState = 'error';
+        }
+        reportAudio(shakeState, 'shake');
+        iceBurst();
+        await wait(ms(540));
+        shakerInner.classList.remove('rattle');
+        await wait(ms(90));
+
+        await bottlePour(speed, { source: shakerEl, color: drink.stream });
+        shakerEl.classList.remove('on');
+        bottleEl.classList.remove('away');
+        await wait(ms(120));
+      }
+
+      /* ----------------------------------------------------------------- ui */
+      function pop() {
+        countEl.classList.add('pop', 'flash');
+        setTimeout(() => countEl.classList.remove('pop'), 110);
+        setTimeout(() => countEl.classList.remove('flash'), 260);
+      }
+
+      function render(state) {
+        if (state.label) labelEl.textContent = state.label;
+        if (state.sound) Sound.configure(state.sound.enabled, state.sound.volume);
+        if (state.drink && state.drink !== drinkKey) applyDrink(state.drink);
+        if (state.count === undefined) return;
+        if (current !== null && state.count > current) {
+          pop();
+          for (let i = current; i < state.count; i += 1) enqueuePour();
+        }
+        current = state.count;
+        countEl.textContent = state.count;
+      }
+
+      applyDrink(DEFAULT_DRINK);
+      Sound.ensure();
+
+      let ws;
+      function connect() {
+        ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?client=overlay');
+        ws.onmessage = (event) => render(JSON.parse(event.data));
+        ws.onclose = () => setTimeout(connect, 800);
+        ws.onerror = () => ws.close();
+      }
+      connect();
+    </script>
+  </body>
+</html>
