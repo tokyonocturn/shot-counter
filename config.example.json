@@ -11,8 +11,8 @@
     "key": "F9"
   },
   "obs": {
-    "enabled": false,
-    "host": "127.0.0.1",
+    "enabled": true,
+    "host": "192.168.0.140",
     "port": 4455,
     "password": ""
   }

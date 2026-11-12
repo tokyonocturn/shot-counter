@@ -26,8 +26,10 @@ const DEFAULT_CONFIG = {
   sound: { enabled: true, volume: 0.75 },
   resetOnStreamStart: true,
   localHotkey: { key: 'F9' },
-  // shipped defaults carry no credentials; config.json holds the real ones
-  obs: { enabled: true, host: '127.0.0.1', port: 4455, password: '' },
+  // OBS mode is the default. The host and port are the streaming PC; the password
+  // is deliberately empty here and is entered in the dashboard, so no secret is
+  // ever shipped in the repo or in the zip.
+  obs: { enabled: true, host: '192.168.0.140', port: 4455, password: '' },
 };
 
 /* ---------------------------------------------------------------- storage */
@@ -115,6 +117,7 @@ function snapshot(forRequest) {
       connected: obsState.connected,
       streaming: obsState.streaming,
       version: obsState.version,
+      lastError: obsState.lastError,
     },
   };
 }
@@ -157,11 +160,39 @@ function resetCount() {
 let obs = null;
 let obsRetryTimer = null;
 let obsAttempt = 0;
-const obsState = { connected: false, streaming: false, version: null };
+const obsState = { connected: false, streaming: false, version: null, lastError: null };
 
+// Retry timing: quick at first, then back off so a machine that is simply off
+// does not get hammered, and snap back to fast retries after a success.
+let obsBackoff = 2000;
 function scheduleObsRetry() {
   clearTimeout(obsRetryTimer);
-  obsRetryTimer = setTimeout(connectObs, 4000);
+  obsRetryTimer = setTimeout(connectObs, obsBackoff);
+  obsBackoff = Math.min(15000, Math.round(obsBackoff * 1.6));
+}
+
+// Turn a client error into something a person can act on, and tag it so the
+// dashboard can say exactly why OBS is not connected.
+function describeObsError(error) {
+  const message = String((error && (error.message || error.code)) || error || 'unknown error');
+  const code = error && typeof error.code === 'number' ? error.code : null;
+
+  if (code === 4009 || /authentication failed/i.test(message)) {
+    return { kind: 'auth', code: code || 4009, label: 'OBS rejected the password' };
+  }
+  if (/ECONNREFUSED/i.test(message)) {
+    return { kind: 'unreachable', code: null, label: 'nothing is listening there, is OBS running with the WebSocket server on' };
+  }
+  if (/ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH/i.test(message)) {
+    return { kind: 'unreachable', code: null, label: 'that host cannot be reached from this PC' };
+  }
+  if (/ETIMEDOUT|timeout/i.test(message)) {
+    return { kind: 'unreachable', code: null, label: 'the connection timed out' };
+  }
+  if (/not ready/i.test(message)) {
+    return { kind: 'starting', code: null, label: 'OBS is still starting up' };
+  }
+  return { kind: 'other', code, label: message };
 }
 
 // one press can produce more than one signal (an OBS event plus the local agent,
@@ -308,6 +339,8 @@ async function connectObs() {
     obsState.connected = true;
     obsState.streaming = Boolean(stream.outputActive);
     obsState.version = version.obsVersion;
+    obsState.lastError = null;
+    obsBackoff = 2000;
     logObsConnected(url, version.obsVersion);
     broadcast();
     await ensureTriggerSource();
@@ -317,7 +350,8 @@ async function connectObs() {
     obsState.streaming = false;
     obsState.version = null;
     triggerState.ready = false;
-    logObsFailure(`${url} -> ${error.message || error.code || error}`);
+    obsState.lastError = describeObsError(error);
+    logObsFailure(`${url} -> ${obsState.lastError.label} (${error.message || error.code || error})`);
     broadcast();
     scheduleObsRetry();
   }

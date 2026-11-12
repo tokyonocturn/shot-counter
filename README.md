@@ -34,7 +34,9 @@ Then open <http://localhost:4321/> for the dashboard, or <http://localhost:4321/
 2. Close OBS, then run `npm run setup-hotkey`. This writes the trigger binding into your scene collection and keeps a timestamped backup in `backup/`. It refuses to run while OBS is open, because OBS would overwrite the file on exit.
 3. Start OBS, then `start.bat` or `npm start`.
 4. In OBS add a **Browser** source pointing at <http://localhost:4321/overlay>.
-5. Open the dashboard and turn **Run without OBS** off if it is on, so the OBS trigger is used.
+5. Open the dashboard and paste the OBS WebSocket password into the OBS card, then press **Save and connect**.
+
+OBS mode is the default in both the checkout and the packaged zip: host `192.168.0.140`, port `4455`, and an empty password slot that you fill in the dashboard, so no secret is stored in the repo or the zip. When OBS is not reachable the dashboard names the exact reason (nothing listening, host unreachable, password rejected, OBS still starting) and keeps retrying with a growing delay, so it reconnects by itself once OBS is up.
 
 If you would rather bind the key by hand: OBS, Settings, Hotkeys, search for **Shot Counter Trigger**, and bind **Restart playback** to your key. The trigger source is a muted, invisible media source parked off canvas.
 
@@ -110,7 +112,7 @@ The agent is compiled from `tools/local-hotkey.cs` on your machine by `setup-loc
 | `sound` | Overlay sound switch and volume |
 | `resetOnStreamStart` | Reset the count when an OBS stream starts |
 | `localHotkey.key` | Key the offline agent registers |
-| `obs.enabled` | `false` runs fully offline and never contacts OBS |
+| `obs.enabled` | `true` by default (OBS mode); `false` runs fully offline and never contacts OBS |
 | `obs.host`, `obs.port`, `obs.password` | OBS WebSocket connection |
 
 ## API

@@ -268,6 +268,7 @@
           <button class="ghost" id="saveObsBtn">Save &amp; connect</button>
           <span class="k" id="obsVersion"></span>
         </div>
+        <p class="hint" id="obsError" style="display: none; color: #ff9aa2"></p>
         <label class="toggle" style="margin-top: 14px">
           <input type="checkbox" id="resetToggle" />
           <span>Reset count when the stream starts</span>
@@ -411,13 +412,26 @@
           if (document.activeElement !== $('obsPass')) $('obsPass').value = s.obs.password || '';
           const dot = $('obsDot');
           dot.className = 'dot' + (s.obs.connected ? (s.obs.streaming ? ' live' : ' on') : '');
+          const error = s.obs.lastError;
           $('obsText').textContent = !s.obs.enabled
             ? 'Offline mode (no OBS)'
             : s.obs.connected
               ? s.obs.streaming
                 ? 'OBS connected - streaming'
                 : 'OBS connected'
-              : 'OBS not connected';
+              : error && error.kind === 'auth'
+                ? 'OBS: password rejected'
+                : 'OBS not connected';
+
+          const errorEl = $('obsError');
+          if (!s.obs.enabled || s.obs.connected || !error) {
+            errorEl.style.display = 'none';
+          } else {
+            errorEl.style.display = 'block';
+            errorEl.textContent =
+              'OBS: ' + error.label + (error.code ? ' (code ' + error.code + ')' : '') +
+              '. Retrying automatically; it connects as soon as OBS is available.';
+          }
           $('obsVersion').textContent = s.obs.version ? 'OBS ' + s.obs.version : '';
         }
         if (s.canUndo !== undefined) $('undoBtn').disabled = !s.canUndo;

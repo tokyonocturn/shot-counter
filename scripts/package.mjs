@@ -83,7 +83,9 @@ await fsp.writeFile(
       sound: { enabled: true, volume: 0.75 },
       resetOnStreamStart: true,
       localHotkey: { key: localKey },
-      obs: { enabled: false, host: '127.0.0.1', port: 4455, password: '' },
+      // OBS mode by default, pointed at the target machine. No password is
+      // shipped: the user types it in the dashboard and it stays local.
+      obs: { enabled: true, host: '192.168.0.140', port: 4455, password: '' },
     },
     null,
     2
@@ -99,16 +101,20 @@ await fsp.writeFile(
     '2. Double click start.bat.',
     '   It starts the counter and the local hotkey agent together, and builds the',
     '   agent on first run with tools that already ship with Windows.',
-    '3. Press the hotkey to add a shot. The default key is ' + localKey + '.',
-    '   Change it with: node setup-local-hotkey.mjs --key F8',
+    '',
+    'OBS mode is the default. Open the dashboard and type the OBS WebSocket',
+    'password; the status line shows exactly what is wrong if OBS is not there.',
+    'Once connected, OBS owns the hotkey, so press the key that is bound in OBS.',
+    '',
+    'No OBS on this PC? Tick "Run without OBS" in the dashboard. The local agent',
+    'then owns the key (default ' + localKey + ', change it with',
+    'node setup-local-hotkey.mjs --key F8) and everything works offline.',
+    '',
     '4. Open http://localhost:4321/ for the dashboard.',
     '   Open http://localhost:4321/window for the overlay on a second monitor.',
     '',
-    'No internet, no OBS and no account are required. Everything runs on this PC.',
+    'No internet and no account are required. Everything runs on this PC.',
     'Close the start.bat window to stop the counter and the hotkey agent together.',
-    '',
-    'Prefer OBS? Close OBS, run setup-hotkey.bat once, then open OBS and switch the',
-    'dashboard from offline mode to OBS.',
     '',
   ].join('\r\n')
 );
